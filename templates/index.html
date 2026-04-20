@@ -1,1 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TSLA Predictor</title>
 
+  <!-- Google Fonts: Syne (display) + DM Sans (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+
+  <!-- ── Background grain overlay ── -->
+  <div class="grain"></div>
+
+  <!-- ── Page wrapper ── -->
+  <main class="wrapper">
+
+    <!-- ── Header ── -->
+    <header class="header">
+      <div class="ticker-badge">NASDAQ · TSLA</div>
+      <h1 class="headline">
+        Stock Movement<br />
+        <span class="headline-accent">Predictor</span>
+      </h1>
+      <p class="subline">
+        Enter today's technical indicators and let the model forecast
+        whether Tesla closes <strong>higher</strong> or <strong>lower</strong> tomorrow.
+      </p>
+    </header>
+
+    <!-- ── Card grid ── -->
+    <div class="card-grid">
+
+      <!-- ── LEFT: Input form ── -->
+      <section class="card card--form">
+        <h2 class="card-title">Input Features</h2>
+
+        <form action="/predict" method="POST" class="form">
+
+          <!-- MA10 -->
+          <div class="field">
+            <label for="ma10" class="label">
+              10-Day Moving Avg (MA10)
+              <span class="hint">USD · rolling 10-day close average</span>
+            </label>
+            <input
+              id="ma10" name="ma10" type="number" step="0.01"
+              placeholder="e.g. 248.50"
+              value="{{ ma10 if ma10 is defined else '' }}"
+              required
+              class="input"
+            />
+          </div>
+
+          <!-- MA50 -->
+          <div class="field">
+            <label for="ma50" class="label">
+              50-Day Moving Avg (MA50)
+              <span class="hint">USD · rolling 50-day close average</span>
+            </label>
+            <input
+              id="ma50" name="ma50" type="number" step="0.01"
+              placeholder="e.g. 235.80"
+              value="{{ ma50 if ma50 is defined else '' }}"
+              required
+              class="input"
+            />
+          </div>
+
+          <!-- Daily Return -->
+          <div class="field">
+            <label for="daily_return" class="label">
+              Daily Return
+              <span class="hint">Decimal · e.g. 0.023 = +2.3 %</span>
+            </label>
+            <input
+              id="daily_return" name="daily_return" type="number" step="0.0001"
+              placeholder="e.g. 0.0230"
+              value="{{ daily_return if daily_return is defined else '' }}"
+              required
+              class="input"
+            />
+          </div>
+
+          <!-- Avg Volume -->
+          <div class="field">
+            <label for="avg_vol_7" class="label">
+              7-Day Avg Volume
+              <span class="hint">Shares traded · 7-day rolling mean</span>
+            </label>
+            <input
+              id="avg_vol_7" name="avg_vol_7" type="number" step="1"
+              placeholder="e.g. 92000000"
+              value="{{ avg_vol_7 if avg_vol_7 is defined else '' }}"
+              required
+              class="input"
+            />
+          </div>
+
+          <!-- MA Ratio -->
+          <div class="field">
+            <label for="ma_ratio" class="label">
+              MA Ratio (MA10 / MA50)
+              <span class="hint">Unitless · auto-compute: MA10 ÷ MA50</span>
+            </label>
+            <input
+              id="ma_ratio" name="ma_ratio" type="number" step="0.0001"
+              placeholder="e.g. 1.0538"
+              value="{{ ma_ratio if ma_ratio is defined else '' }}"
+              required
+              class="input"
+            />
+          </div>
+
+          <button type="submit" class="btn">Run Prediction →</button>
+        </form>
+      </section>
+
+      <!-- ── RIGHT: Result panel ── -->
+      <section class="card card--result">
+        <h2 class="card-title">Forecast</h2>
+
+        {% if prediction %}
+
+          {% if prediction == "Error" %}
+            <!-- Error state -->
+            <div class="result-state result-state--error">
+              <div class="result-icon">⚠️</div>
+              <p class="result-label">Invalid Input</p>
+              <p class="result-sub">Please check your values and try again.</p>
+            </div>
+
+          {% else %}
+            <!-- Prediction state -->
+            <div class="result-state {% if 'UP' in prediction %}result-state--up{% else %}result-state--down{% endif %}">
+
+              <div class="result-direction">
+                {% if 'UP' in prediction %}↑{% else %}↓{% endif %}
+              </div>
+
+              <p class="result-label">
+                Tomorrow: <strong>{{ prediction }}</strong>
+              </p>
+
+              <p class="result-sub">
+                Model confidence in an upward move
+              </p>
+
+              <!-- Probability bar -->
+              <div class="prob-track">
+                <div
+                  class="prob-fill {% if probability >= 50 %}prob-fill--up{% else %}prob-fill--down{% endif %}"
+                  style="width: {{ probability }}%;"
+                ></div>
+              </div>
+
+              <div class="prob-labels">
+                <span>0 %</span>
+                <span class="prob-value">{{ probability }} %</span>
+                <span>100 %</span>
+              </div>
+
+            </div>
+          {% endif %}
+
+        {% else %}
+          <!-- Empty / initial state -->
+          <div class="result-state result-state--idle">
+            <div class="result-icon">◎</div>
+            <p class="result-label">Awaiting Input</p>
+            <p class="result-sub">Fill in the form and submit to see your prediction.</p>
+          </div>
+        {% endif %}
+
+        <!-- Feature legend -->
+        <div class="legend">
+          <h3 class="legend-title">Feature Guide</h3>
+          <ul class="legend-list">
+            <li><strong>MA10 / MA50</strong> — Short &amp; long-term price trend</li>
+            <li><strong>Daily Return</strong> — Today's percentage move</li>
+            <li><strong>Avg Vol 7</strong> — Recent trading activity</li>
+            <li><strong>MA Ratio</strong> — Momentum indicator (MA10 ÷ MA50)</li>
+          </ul>
+        </div>
+      </section>
+
+    </div><!-- /.card-grid -->
+
+    <!-- ── Footer ── -->
+    <footer class="footer">
+      <p>Powered by RandomForest · yfinance data · For educational use only. Not financial advice.</p>
+    </footer>
+
+  </main>
+
+</body>
+</html>
